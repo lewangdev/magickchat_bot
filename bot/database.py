@@ -1,22 +1,52 @@
 from typing import Optional, Any
 
-import pymongo
 import uuid
 from datetime import datetime
 
 import config
 
+from peewee import *
+
+database_proxy = DatabaseProxy()
+
+
+class Base(Model):
+    class Meta:
+        database = database_proxy
+        legacy_table_names = False
+
+
+class User(Base):
+    id = AutoField(primary_key=True)
+    user_id = IntegerField()
+    chat_id = IntegerField()
+    username = CharField()
+    first_name = CharField()
+    last_name = CharField()
+    last_interaction = DateTimeField(default=datetime.now())
+    first_seen = DateTimeField(default=datetime.now())
+    current_dialog_id = IntegerField(null=True)
+    current_chat_mode = CharField(default="assistant")
+    used_tokens = IntegerField(default=0)
+
+
+class Dialog(Base):
+    id = AutoField(primary_key=True)
+    user_id = IntegerField()
+    chat_mode = CharField()
+    start_time = DateTimeField(default=datetime.now())
+    first_seen = DateTimeField(default=datetime.now())
+    current_dialog_id = IntegerField(null=True)
+    current_chat_mode = CharField(default="assistant")
+    used_tokens = IntegerField(default=0)
+
 
 class Database:
     def __init__(self):
-        self.client = pymongo.MongoClient(config.mongodb_uri)
-        self.db = self.client["chatgpt_telegram_bot"]
-
-        self.user_collection = self.db["user"]
-        self.dialog_collection = self.db["dialog"]
+        pass
 
     def check_if_user_exists(self, user_id: int, raise_exception: bool = False):
-        if self.user_collection.count_documents({"_id": user_id}) > 0:
+        if User.select().where(User.user_id == user_id).count() > 0:
             return True
         else:
             if raise_exception:
@@ -32,25 +62,25 @@ class Database:
         first_name: str = "",
         last_name: str = "",
     ):
-        user_dict = {
-            "_id": user_id,
-            "chat_id": chat_id,
+        user = User(
+            user_id=user_id,
+            chat_id= chat_id,
 
-            "username": username,
-            "first_name": first_name,
-            "last_name": last_name,
+            username= username,
+            first_name= first_name,
+            last_name= last_name,
 
-            "last_interaction": datetime.now(),
-            "first_seen": datetime.now(),
+            last_interaction= datetime.now(),
+            first_seen= datetime.now(),
             
-            "current_dialog_id": None,
-            "current_chat_mode": "assistant",
+            current_dialog_id= None,
+            current_chat_mode= "assistant",
 
-            "n_used_tokens": 0
-        }
+            n_used_tokens= 0
+        )
 
         if not self.check_if_user_exists(user_id):
-            self.user_collection.insert_one(user_dict)
+            user.save()
 
     def start_new_dialog(self, user_id: int):
         self.check_if_user_exists(user_id, raise_exception=True)
