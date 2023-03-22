@@ -30,7 +30,7 @@ db = database.Database()
 logger = logging.getLogger(__name__)
 
 HELP_MESSAGE = """Commands:
-⚪ /regen – Regenerate last bot answer
+⚪ /regen – Regenerate last answer
 ⚪ /new – Start new dialog
 ⚪ /mode – Select chat mode
 ⚪ /balance – Show balance
@@ -50,7 +50,7 @@ async def register_user_if_not_exists(update: Update, context: CallbackContext, 
             update.message.chat_id,
             username=user.username,
             first_name=user.first_name,
-            last_name= user.last_name
+            last_name=user.last_name
         )
         db.start_new_dialog(user.id)
 
@@ -61,15 +61,15 @@ async def register_user_if_not_exists(update: Update, context: CallbackContext, 
 async def start_handle(update: Update, context: CallbackContext):
     await register_user_if_not_exists(update, context, update.message.from_user)
     user_id = update.message.from_user.id
-    
+
     db.set_user_attribute(user_id, "last_interaction", datetime.now())
     db.start_new_dialog(user_id)
-    
+
     reply_text = "Hi! I'm <b>MagickChat</b> bot powered by OpenAI 🤖\n\n"
     reply_text += HELP_MESSAGE
 
     reply_text += "\nAnd now... ask me anything!"
-    
+
     await update.message.reply_text(reply_text, parse_mode=ParseMode.HTML)
 
 
@@ -91,7 +91,8 @@ async def regen_handle(update: Update, context: CallbackContext):
         return
 
     last_dialog_message = dialog_messages.pop()
-    db.set_dialog_messages(user_id, dialog_messages, dialog_id=None)  # last message was removed from the context
+    # last message was removed from the context
+    db.set_dialog_messages(user_id, dialog_messages, dialog_id=None)
 
     await message_handle(update, context, message=last_dialog_message["user"], use_new_dialog_timeout=False)
 
@@ -101,7 +102,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
     if update.edited_message is not None:
         await edited_message_handle(update, context)
         return
-        
+
     await register_user_if_not_exists(update, context, update.message.from_user)
     user_id = update.message.from_user.id
     chat_mode = db.get_user_attribute(user_id, "current_chat_mode")
@@ -122,7 +123,8 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
         dialog_messages = db.get_dialog_messages(user_id, dialog_id=None)
         chat_mode = db.get_user_attribute(user_id, "current_chat_mode")
 
-        chatgpt_instance = openai_utils.ChatGPT(use_chatgpt_api=config.use_chatgpt_api)
+        chatgpt_instance = openai_utils.ChatGPT(
+            use_chatgpt_api=config.use_chatgpt_api)
         answer, n_used_tokens, n_first_dialog_messages_removed = await chatgpt_instance.send_message(
             message,
             dialog_messages=dialog_messages,
@@ -130,14 +132,17 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
         )
 
         # update user data
-        new_dialog_message = {"user": message, "bot": answer, "date": datetime.now()}
+        new_dialog_message = {"user": message,
+                              "bot": answer, "date": datetime.now()}
         db.set_dialog_messages(
             user_id,
-            db.get_dialog_messages(user_id, dialog_id=None) + [new_dialog_message],
+            db.get_dialog_messages(
+                user_id, dialog_id=None) + [new_dialog_message],
             dialog_id=None
         )
 
-        db.set_user_attribute(user_id, "n_used_tokens", n_used_tokens + db.get_user_attribute(user_id, "n_used_tokens"))
+        db.set_user_attribute(user_id, "n_used_tokens", n_used_tokens +
+                              db.get_user_attribute(user_id, "n_used_tokens"))
 
     except Exception as e:
         error_text = f"Something went wrong during completion. Reason: {e}"
@@ -160,7 +165,7 @@ async def message_handle(update: Update, context: CallbackContext, message=None,
                 "html": ParseMode.HTML,
                 "markdown": ParseMode.MARKDOWN
             }[openai_utils.CHAT_MODES[chat_mode]["parse_mode"]]
-            
+
             await update.message.reply_text(answer_chunk, parse_mode=parse_mode)
         except telegram.error.BadRequest:
             # answer has invalid characters, so we send it without parse_mode
@@ -183,7 +188,8 @@ async def voice_message_handle(update: Update, context: CallbackContext):
 
         # convert to mp3
         voice_mp3_path = tmp_dir / "voice.mp3"
-        pydub.AudioSegment.from_file(voice_ogg_path).export(voice_mp3_path, format="mp3")
+        pydub.AudioSegment.from_file(voice_ogg_path).export(
+            voice_mp3_path, format="mp3")
 
         # transcribe
         with open(voice_mp3_path, "rb") as f:
@@ -200,7 +206,8 @@ async def voice_message_handle(update: Update, context: CallbackContext):
     # normalize dollars to tokens (it's very convenient to measure everything in a single unit)
     price_per_1000_tokens = config.chatgpt_price_per_1000_tokens if config.use_chatgpt_api else config.gpt_price_per_1000_tokens
     n_used_tokens = int(n_spent_dollars / (price_per_1000_tokens / 1000))
-    db.set_user_attribute(user_id, "n_used_tokens", n_used_tokens + db.get_user_attribute(user_id, "n_used_tokens"))
+    db.set_user_attribute(user_id, "n_used_tokens", n_used_tokens +
+                          db.get_user_attribute(user_id, "n_used_tokens"))
 
 
 async def new_dialog_handle(update: Update, context: CallbackContext):
@@ -222,7 +229,8 @@ async def show_chat_modes_handle(update: Update, context: CallbackContext):
 
     keyboard = []
     for chat_mode, chat_mode_dict in openai_utils.CHAT_MODES.items():
-        keyboard.append([InlineKeyboardButton(chat_mode_dict["name"], callback_data=f"set_chat_mode|{chat_mode}")])
+        keyboard.append([InlineKeyboardButton(
+            chat_mode_dict["name"], callback_data=f"set_chat_mode|{chat_mode}")])
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     await update.message.reply_text("Select chat mode:", reply_markup=reply_markup)
@@ -263,8 +271,8 @@ async def show_balance_handle(update: Update, context: CallbackContext):
     text += f"You used <b>{n_used_tokens}</b> tokens\n\n"
 
     text += "🏷️ Prices\n"
-    text += f"<i>- ChatGPT: {price_per_1000_tokens}$ per 1000 tokens\n"
-    text += f"- Whisper (voice recognition): {config.whisper_price_per_1_min}$ per 1 minute</i>"
+    text += f"<i>- ChatGPT: ${price_per_1000_tokens} per 1000 tokens\n"
+    text += f"- Whisper: ${config.whisper_price_per_1_min} per 1 minute</i>"
 
     await update.message.reply_text(text, parse_mode=ParseMode.HTML)
 
@@ -275,11 +283,13 @@ async def edited_message_handle(update: Update, context: CallbackContext):
 
 
 async def error_handle(update: Update, context: CallbackContext) -> None:
-    logger.error(msg="Exception while handling an update:", exc_info=context.error)
+    logger.error(msg="Exception while handling an update:",
+                 exc_info=context.error)
 
     try:
         # collect error message
-        tb_list = traceback.format_exception(None, context.error, context.error.__traceback__)
+        tb_list = traceback.format_exception(
+            None, context.error, context.error.__traceback__)
         tb_string = "".join(tb_list)
         update_str = update.to_dict() if isinstance(update, Update) else str(update)
         message = (
@@ -299,6 +309,7 @@ async def error_handle(update: Update, context: CallbackContext) -> None:
     except:
         await context.bot.send_message(update.effective_chat.id, "Some error in error handler")
 
+
 def run_bot() -> None:
     application = (
         ApplicationBuilder()
@@ -313,22 +324,31 @@ def run_bot() -> None:
     else:
         user_filter = filters.User(username=config.allowed_telegram_usernames)
 
-    application.add_handler(CommandHandler("start", start_handle, filters=user_filter))
-    application.add_handler(CommandHandler("help", help_handle, filters=user_filter))
+    application.add_handler(CommandHandler(
+        "start", start_handle, filters=user_filter))
+    application.add_handler(CommandHandler(
+        "help", help_handle, filters=user_filter))
 
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND & user_filter, message_handle))
-    application.add_handler(CommandHandler("regen", regen_handle, filters=user_filter))
-    application.add_handler(CommandHandler("new", new_dialog_handle, filters=user_filter))
+    application.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & user_filter, message_handle))
+    application.add_handler(CommandHandler(
+        "regen", regen_handle, filters=user_filter))
+    application.add_handler(CommandHandler(
+        "new", new_dialog_handle, filters=user_filter))
 
-    application.add_handler(MessageHandler(filters.VOICE & user_filter, voice_message_handle))
-    
-    application.add_handler(CommandHandler("mode", show_chat_modes_handle, filters=user_filter))
-    application.add_handler(CallbackQueryHandler(set_chat_mode_handle, pattern="^set_chat_mode"))
+    application.add_handler(MessageHandler(
+        filters.VOICE & user_filter, voice_message_handle))
 
-    application.add_handler(CommandHandler("balance", show_balance_handle, filters=user_filter))
-    
+    application.add_handler(CommandHandler(
+        "mode", show_chat_modes_handle, filters=user_filter))
+    application.add_handler(CallbackQueryHandler(
+        set_chat_mode_handle, pattern="^set_chat_mode"))
+
+    application.add_handler(CommandHandler(
+        "balance", show_balance_handle, filters=user_filter))
+
     application.add_error_handler(error_handle)
-    
+
     # start the bot
     application.run_polling()
 

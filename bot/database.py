@@ -17,28 +17,33 @@ class Base(Model):
 
 
 class User(Base):
-    id = AutoField(primary_key=True)
-    user_id = IntegerField()
-    chat_id = IntegerField()
+    id = BigAutoField(primary_key=True)
+    user_id = BigIntegerField(unique=True)
+    chat_id = BigIntegerField()
     username = CharField()
-    first_name = CharField()
-    last_name = CharField()
+    first_name = CharField(null=True)
+    last_name = CharField(null=True)
     last_interaction = DateTimeField(default=datetime.now())
     first_seen = DateTimeField(default=datetime.now())
-    current_dialog_id = IntegerField(null=True)
+    current_dialog_id = BigIntegerField(null=True)
     current_chat_mode = CharField(default="assistant")
-    used_tokens = IntegerField(default=0)
+    used_tokens = BigIntegerField(default=0)
 
 
 class Dialog(Base):
-    id = AutoField(primary_key=True)
-    user_id = IntegerField()
+    id = BigAutoField(primary_key=True)
+    user_id = BigIntegerField()
     chat_mode = CharField()
     start_time = DateTimeField(default=datetime.now())
     first_seen = DateTimeField(default=datetime.now())
-    current_dialog_id = IntegerField(null=True)
+    current_dialog_id = BigIntegerField(null=True)
     current_chat_mode = CharField(default="assistant")
     used_tokens = IntegerField(default=0)
+
+
+class DialogMessage(Base):
+    id = BigAutoField(primary_key=True)
+    user_id = BigIntegerField()
 
 
 class Database:
@@ -53,7 +58,7 @@ class Database:
                 raise ValueError(f"User {user_id} does not exist")
             else:
                 return False
-        
+
     def add_new_user(
         self,
         user_id: int,
@@ -64,19 +69,19 @@ class Database:
     ):
         user = User(
             user_id=user_id,
-            chat_id= chat_id,
+            chat_id=chat_id,
 
-            username= username,
-            first_name= first_name,
-            last_name= last_name,
+            username=username,
+            first_name=first_name,
+            last_name=last_name,
 
-            last_interaction= datetime.now(),
-            first_seen= datetime.now(),
-            
-            current_dialog_id= None,
-            current_chat_mode= "assistant",
+            last_interaction=datetime.now(),
+            first_seen=datetime.now(),
 
-            n_used_tokens= 0
+            current_dialog_id=None,
+            current_chat_mode="assistant",
+
+            n_used_tokens=0
         )
 
         if not self.check_if_user_exists(user_id):
@@ -85,7 +90,6 @@ class Database:
     def start_new_dialog(self, user_id: int):
         self.check_if_user_exists(user_id, raise_exception=True)
 
-        dialog_id = str(uuid.uuid4())
         dialog_dict = {
             "_id": dialog_id,
             "user_id": user_id,
@@ -116,7 +120,8 @@ class Database:
 
     def set_user_attribute(self, user_id: int, key: str, value: Any):
         self.check_if_user_exists(user_id, raise_exception=True)
-        self.user_collection.update_one({"_id": user_id}, {"$set": {key: value}})
+        self.user_collection.update_one(
+            {"_id": user_id}, {"$set": {key: value}})
 
     def get_dialog_messages(self, user_id: int, dialog_id: Optional[str] = None):
         self.check_if_user_exists(user_id, raise_exception=True)
@@ -124,7 +129,8 @@ class Database:
         if dialog_id is None:
             dialog_id = self.get_user_attribute(user_id, "current_dialog_id")
 
-        dialog_dict = self.dialog_collection.find_one({"_id": dialog_id, "user_id": user_id})               
+        dialog_dict = self.dialog_collection.find_one(
+            {"_id": dialog_id, "user_id": user_id})
         return dialog_dict["messages"]
 
     def set_dialog_messages(self, user_id: int, dialog_messages: list, dialog_id: Optional[str] = None):
@@ -132,7 +138,7 @@ class Database:
 
         if dialog_id is None:
             dialog_id = self.get_user_attribute(user_id, "current_dialog_id")
-        
+
         self.dialog_collection.update_one(
             {"_id": dialog_id, "user_id": user_id},
             {"$set": {"messages": dialog_messages}}
